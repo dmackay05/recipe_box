@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a1714">
+<title>Notebook — Recipe Box</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1a1714;
+    --bg-raised:#211c17;
+    --card:#252019;
+    --card-2:#2c251c;
+    --line:#3a3226;
+    --text:#e8dfd0;
+    --text-dim:#a89a82;
+    --text-faint:#6e6354;
+    --accent:#c9a04e;
+    --accent-dim:#8a703a;
+    --accent-soft:rgba(201,160,78,0.12);
+    --good:#7a9b76;
+    --bad:#b96452;
+    --radius:14px;
+    --radius-sm:8px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'DM Sans',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:84px;
+    min-height:100vh;
+  }
+  h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif;}
+  .mono{font-family:'DM Mono',monospace;}
+  a{color:inherit;}
+
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:rgba(26,23,20,0.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+    padding:16px 18px 12px;
+  }
+  header.top .row{display:flex; align-items:baseline; justify-content:space-between;}
+  header.top h1{font-size:1.6rem; font-weight:600; margin:0; letter-spacing:0.01em;}
+  header.top .sub{font-size:0.72rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em; margin-top:2px;}
+  .icon-btn{
+    background:none; border:1px solid var(--line); color:var(--text-dim);
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:1.1rem; cursor:pointer;
+  }
+  .icon-btn:active{background:var(--card);}
+
+  .search-row{margin-top:12px; display:flex; gap:8px;}
+  .search-row input{
+    flex:1; background:var(--card); border:1px solid var(--line); color:var(--text);
+    padding:10px 14px; border-radius:10px; font-size:0.9rem; font-family:inherit;
+  }
+  .search-row input::placeholder{color:var(--text-faint);}
+
+  .cat-scroll{
+    display:flex; gap:8px; overflow-x:auto; padding:14px 18px 4px; scrollbar-width:none;
+  }
+  .cat-scroll::-webkit-scrollbar{display:none;}
+  .cat-chip{
+    flex:0 0 auto; padding:7px 14px; border-radius:999px; border:1px solid var(--line);
+    background:var(--card); color:var(--text-dim); font-size:0.8rem; white-space:nowrap; cursor:pointer;
+  }
+  .cat-chip.active{background:var(--accent-soft); border-color:var(--accent-dim); color:var(--accent);}
+
+  main{padding:6px 18px 24px;}
+  .recipe-grid{display:flex; flex-direction:column; gap:10px; margin-top:8px;}
+  .recipe-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; cursor:pointer; position:relative; overflow:hidden;
+  }
+  .recipe-card:active{background:var(--card-2);}
+  .recipe-card .cat-tag{
+    font-size:0.65rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--accent); font-weight:600;
+  }
+  .recipe-card h3{font-size:1.3rem; margin:3px 0 5px; font-weight:600; line-height:1.15;}
+  .recipe-card .meta{display:flex; gap:12px; font-size:0.74rem; color:var(--text-faint);}
+  .recipe-card .meta span{display:flex; align-items:center; gap:4px;}
+
+  .empty-state{
+    text-align:center; padding:60px 24px; color:var(--text-faint);
+  }
+  .empty-state .glyph{font-size:2.2rem; margin-bottom:10px; opacity:0.6;}
+  .empty-state h3{color:var(--text-dim); font-size:1.3rem; margin:0 0 6px;}
+  .empty-state p{font-size:0.85rem; margin:0; line-height:1.5;}
+
+  nav.tabbar{
+    position:fixed; bottom:0; left:0; right:0; z-index:20;
+    background:rgba(26,23,20,0.95); backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  }
+  nav.tabbar button{
+    flex:1; background:none; border:none; color:var(--text-faint);
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:0.66rem; font-family:'DM Sans'; padding:6px 0; cursor:pointer; letter-spacing:0.02em;
+  }
+  nav.tabbar button .ico{font-size:1.2rem;}
+  nav.tabbar button.active{color:var(--accent);}
+
+  .fab{
+    position:fixed; right:18px; bottom:84px; z-index:21;
+    width:54px; height:54px; border-radius:50%;
+    background:var(--accent); color:#1a1714; border:none;
+    font-size:1.6rem; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 18px rgba(0,0,0,0.4); cursor:pointer;
+  }
+  .fab:active{transform:scale(0.95);}
+
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:50;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .sheet-overlay.open{display:flex;}
+  .sheet{
+    background:var(--bg-raised); width:100%; max-width:560px; max-height:92vh;
+    border-radius:20px 20px 0 0; overflow-y:auto; border:1px solid var(--line); border-bottom:none;
+    padding:18px 18px calc(24px + env(safe-area-inset-bottom));
+    animation:slideUp 0.22s ease-out;
+  }
+  @keyframes slideUp{from{transform:translateY(24px); opacity:0.6;} to{transform:translateY(0); opacity:1;}}
+  .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:99px; margin:0 auto 14px;}
+  .sheet h2{font-size:1.4rem; margin:0 0 14px; font-weight:600;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); margin-bottom:6px;}
+  .field input, .field select, .field textarea{
+    width:100%; background:var(--card); border:1px solid var(--line); color:var(--text);
+    padding:11px 13px; border-radius:10px; font-size:0.92rem; font-family:'DM Sans'; resize:vertical;
+  }
+  .field textarea{min-height:64px;}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+
+  .ing-row, .step-row{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; margin-bottom:8px;
+  }
+  .ing-row .line1{display:flex; gap:8px;}
+  .ing-row input.amt{width:64px; flex:0 0 64px;}
+  .ing-row input.unit{width:78px; flex:0 0 78px;}
+  .ing-row input.name{flex:1;}
+  .ing-row input, .step-row textarea{
+    background:var(--bg-raised); border:1px solid var(--line); color:var(--text);
+    padding:8px 10px; border-radius:8px; font-size:0.85rem; font-family:'DM Sans';
+  }
+  .ing-row .sub-row{display:flex; gap:8px; margin-top:6px; align-items:center;}
+  .link-btn{
+    font-size:0.7rem; color:var(--text-faint); background:none; border:1px dashed var(--line);
+    border-radius:8px; padding:5px 10px; cursor:pointer; white-space:nowrap;
+  }
+  .link-btn.linked{color:var(--good); border-color:var(--good); border-style:solid; background:rgba(122,155,118,0.1);}
+  .row-x{
+    background:none; border:none; color:var(--text-faint); font-size:1.1rem; cursor:pointer; padding:0 4px;
+  }
+
+  .step-row{display:flex; gap:10px; align-items:flex-start;}
+  .step-num{
+    flex:0 0 26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:600; margin-top:2px;
+    font-family:'DM Mono';
+  }
+  .step-row .step-body{flex:1;}
+  .step-row textarea{width:100%; min-height:50px;}
+  .why-toggle{
+    font-size:0.68rem; color:var(--accent-dim); background:none; border:none; cursor:pointer;
+    margin-top:6px; padding:0; text-decoration:underline; text-decoration-style:dotted;
+  }
+  .why-field{margin-top:6px; display:none;}
+  .why-field.open{display:block;}
+  .why-field textarea{width:100%; min-height:44px; font-size:0.8rem; font-style:italic;}
+
+  .add-line-btn{
+    width:100%; background:none; border:1px dashed var(--line); color:var(--text-dim);
+    padding:11px; border-radius:10px; font-size:0.85rem; cursor:pointer; margin-bottom:14px;
+  }
+  .add-line-btn:active{background:var(--card);}
+
+  .btn-primary{
+    width:100%; background:var(--accent); color:#1a1714; border:none; font-weight:600;
+    padding:14px; border-radius:12px; font-size:0.95rem; cursor:pointer; font-family:'DM Sans';
+  }
+  .btn-secondary{
+    width:100%; background:none; border:1px solid var(--line); color:var(--text-dim);
+    padding:13px; border-radius:12px; font-size:0.9rem; cursor:pointer; margin-top:8px; font-family:'DM Sans';
+  }
+  .btn-danger{color:var(--bad);}
+
+  /* Recipe detail view */
+  .detail-overlay{position:fixed; inset:0; background:var(--bg); z-index:40; display:none; overflow-y:auto;}
+  .detail-overlay.open{display:block;}
+  .detail-head{padding:16px 18px 0; position:sticky; top:0; background:var(--bg); z-index:5;}
+  .detail-head .nav-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .detail-cat{font-size:0.7rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--accent); font-weight:600;}
+  .detail-title{font-size:2rem; font-weight:600; margin:4px 0 10px; line-height:1.1;}
+  .detail-meta-row{display:flex; gap:16px; flex-wrap:wrap; font-size:0.78rem; color:var(--text-dim); padding-bottom:14px; border-bottom:1px solid var(--line);}
+  .detail-meta-row .m{display:flex; flex-direction:column;}
+  .detail-meta-row .m .v{font-family:'DM Mono'; color:var(--text); font-size:0.88rem; margin-top:1px;}
+  .detail-meta-row .m .l{font-size:0.62rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint);}
+
+  .detail-body{padding:18px;}
+  .section-label{font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin:0 0 10px; display:flex; align-items:center; gap:8px;}
+  .section-label::after{content:''; flex:1; height:1px; background:var(--line);}
+
+  .nutri-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:22px;
+  }
+  .nutri-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px;}
+  .nutri-grid .n{text-align:center;}
+  .nutri-grid .n .val{font-family:'DM Mono'; font-size:1.05rem; color:var(--accent);}
+  .nutri-grid .n .lab{font-size:0.62rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em; margin-top:2px;}
+  .partial-note{font-size:0.7rem; color:var(--text-faint); margin-top:10px; font-style:italic;}
+
+  .ing-list{list-style:none; margin:0 0 22px; padding:0;}
+  .ing-list li{
+    display:flex; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line);
+    font-size:0.92rem;
+  }
+  .ing-list li:last-child{border-bottom:none;}
+  .ing-list .amt{font-family:'DM Mono'; color:var(--accent); flex:0 0 64px; margin-right:6px; white-space:nowrap;}
+
+  .steps-list{list-style:none; margin:0; padding:0;}
+  .steps-list li{display:flex; gap:14px; margin-bottom:18px;}
+  .steps-list .snum{
+    flex:0 0 30px; height:30px; border-radius:50%; background:var(--accent-soft); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-family:'DM Mono'; font-size:0.85rem; font-weight:600;
+  }
+  .steps-list .stext{flex:1; padding-top:2px; line-height:1.5; font-size:0.94rem;}
+  .why-note{
+    margin-top:8px; padding-left:12px; border-left:2px solid var(--accent-dim);
+    font-size:0.82rem; color:var(--text-dim); font-style:italic; line-height:1.5;
+  }
+  .why-note .label{
+    display:block; font-style:normal; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.07em;
+    color:var(--accent-dim); margin-bottom:3px;
+  }
+
+  .detail-actions{display:flex; gap:10px; padding:0 18px 20px;}
+  .detail-actions button{flex:1;}
+
+  /* Sync modal */
+  .sync-status{font-size:0.78rem; color:var(--text-dim); margin-bottom:14px; line-height:1.5;}
+  .sync-status .ts{color:var(--text-faint); font-family:'DM Mono'; font-size:0.72rem;}
+
+  .settings-hint{font-size:0.74rem; color:var(--text-faint); line-height:1.5; margin-top:-6px; margin-bottom:4px;}
+
+  .toast{
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+    background:var(--card-2); border:1px solid var(--line); color:var(--text);
+    padding:10px 18px; border-radius:10px; font-size:0.82rem; z-index:60;
+    opacity:0; transition:opacity 0.25s; pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  @media (prefers-reduced-motion:reduce){
+    .sheet{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="row">
+    <div>
+      <h1>Notebook</h1>
+      <div class="sub">Recipe Box</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
+      <button class="icon-btn" id="syncBtn" title="Sync">⟲</button>
+    </div>
+  </div>
+  <div class="search-row">
+    <input type="text" id="searchInput" placeholder="Search recipes, ingredients...">
+  </div>
+</header>
+
+<div class="cat-scroll" id="catScroll"></div>
+
+<main>
+  <div class="recipe-grid" id="recipeGrid"></div>
+  <div class="empty-state" id="emptyState" style="display:none;">
+    <div class="glyph">📖</div>
+    <h3>Nothing here yet</h3>
+    <p>Tap the + button to write your first recipe.</p>
+  </div>
+</main>
+
+<button class="fab" id="fabAdd">+</button>
+
+<nav class="tabbar">
+  <button class="active" data-tab="browse"><span class="ico">📖</span>Browse</button>
+  <button data-tab="sync"><span class="ico">⟲</span>Sync</button>
+</nav>
+
+<!-- Recipe Detail -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-head">
+    <div class="nav-row">
+      <button class="icon-btn" id="detailBack">←</button>
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="detailEdit">✎</button>
+        <button class="icon-btn" id="detailDelete">🗑</button>
+      </div>
+    </div>
+    <div class="detail-cat" id="detailCat"></div>
+    <div class="detail-title serif" id="detailTitle"></div>
+    <div class="detail-meta-row" id="detailMetaRow"></div>
+  </div>
+  <div class="detail-body">
+    <div class="nutri-card" id="nutriCard" style="display:none;">
+      <div class="section-label">Per Serving</div>
+      <div class="nutri-grid" id="nutriGrid"></div>
+      <div class="partial-note" id="partialNote" style="display:none;">Some ingredients aren't linked to nutrition data — totals may be incomplete.</div>
+    </div>
+
+    <div class="section-label">Ingredients</div>
+    <ul class="ing-list" id="detailIngList"></ul>
+
+    <div class="section-label">Steps</div>
+    <ol class="steps-list" id="detailStepsList"></ol>
+
+    <div id="detailNotesWrap" style="display:none;">
+      <div class="section-label">Notes</div>
+      <p style="font-size:0.88rem; color:var(--text-dim); line-height:1.6;" id="detailNotes"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Recipe Sheet -->
+<div class="sheet-overlay" id="editOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="editSheetTitle">New Recipe</h2>
+
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="f_title" placeholder="e.g. Weeknight Pan-Seared Chicken">
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Category</label>
+        <select id="f_category"></select>
+      </div>
+      <div class="field">
+        <label>Servings</label>
+        <input type="number" id="f_servings" placeholder="4" min="1">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Prep time</label>
+        <input type="text" id="f_prep" placeholder="15 min">
+      </div>
+      <div class="field">
+        <label>Cook time</label>
+        <input type="text" id="f_cook" placeholder="25 min">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Equipment</label>
+      <input type="text" id="f_equipment" placeholder="12-inch cast iron skillet, instant-read thermometer">
+    </div>
+
+    <div class="field">
+      <label>Ingredients</label>
+      <div id="ingList"></div>
+      <button class="add-line-btn" id="addIngBtn">+ Add ingredient</button>
+    </div>
+
+    <div class="field">
+      <label>Steps</label>
+      <div id="stepList"></div>
+      <button class="add-line-btn" id="addStepBtn">+ Add step</button>
+    </div>
+
+    <div class="field">
+      <label>Notes / Source</label>
+      <textarea id="f_notes" placeholder="Adapted from... / tastes best with..."></textarea>
+    </div>
+
+    <button class="btn-primary" id="saveRecipeBtn">Save Recipe</button>
+    <button class="btn-secondary" id="cancelEditBtn">Cancel</button>
+  </div>
+</div>
+
+<!-- USDA Link Sheet -->
+<div class="sheet-overlay" id="usdaOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Link Nutrition</h2>
+    <div class="field">
+      <label>Search USDA database</label>
+      <input type="text" id="usdaSearch" placeholder="e.g. chicken breast, raw">
+    </div>
+    <div id="usdaResults" style="margin-top:10px;"></div>
+    <button class="btn-secondary" id="usdaCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<!-- Sync Sheet -->
+<div class="sheet-overlay" id="syncOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Sync to Google Sheet</h2>
+    <div class="sync-status" id="syncStatusText">Not configured yet.</div>
+    <button class="btn-primary" id="pushBtn">Push to Sheet</button>
+    <button class="btn-secondary" id="pullBtn">Pull from Sheet</button>
+    <button class="btn-secondary" id="goToSettingsBtn">Edit Sheet connection →</button>
+    <button class="btn-secondary" id="closeSyncBtn">Close</button>
+  </div>
+</div>
+
+<!-- Settings Sheet -->
+<div class="sheet-overlay" id="settingsOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Settings</h2>
+
+    <div class="field">
+      <label>Google Apps Script URL</label>
+      <input type="text" id="set_scriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="settings-hint">Paste the /exec URL from your deployed Apps Script. This is what Push/Pull in the Sync tab talk to.</div>
+
+    <div class="field" style="margin-top:18px;">
+      <label>USDA FoodData Central API Key</label>
+      <input type="text" id="set_usdaKey" placeholder="paste your USDA API key">
+    </div>
+    <div class="settings-hint">Same key your fitness tracker uses. Needed only for linking nutrition data to ingredients — recipes work fine without it.</div>
+
+    <button class="btn-primary" id="saveSettingsBtn" style="margin-top:18px;">Save Settings</button>
+    <button class="btn-secondary" id="closeSettingsBtn">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="usda.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
