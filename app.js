@@ -648,6 +648,7 @@ function setUsdaKey(key){ localStorage.setItem(USDA_KEY_KEY, key); }
 function openSettingsSheet(){
   $('#set_scriptUrl').value = getScriptUrl();
   $('#set_usdaKey').value = getUsdaKey();
+  $('#importStatus').textContent = '';
   $('#settingsOverlay').classList.add('open');
 }
 function closeSettingsSheet(){ $('#settingsOverlay').classList.remove('open'); }
@@ -659,6 +660,99 @@ function saveSettings(){
   setUsdaKey(key);
   closeSettingsSheet();
   showToast('Settings saved');
+}
+
+// ---------- Import recipe file ----------
+// Normalizes a loosely-shaped recipe object (e.g. one transcribed by Claude
+// from a photo) into the exact shape the app expects, filling in safe
+// defaults for anything missing rather than rejecting the whole file.
+function normalizeImportedRecipe(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const title = (raw.title || '').toString().trim();
+  if(!title) return null; // title is the one truly required field
+
+  const validCats = CATEGORIES.filter(c => c !== 'All');
+  let category = (raw.category || '').toString().trim();
+  if(!validCats.includes(category)) category = 'Mains';
+
+  const ingredients = Array.isArray(raw.ingredients) ? raw.ingredients
+    .map(i => ({
+      amount: (i.amount ?? '').toString(),
+      unit: (i.unit ?? '').toString(),
+      name: (i.name ?? '').toString().trim(),
+      usda: (i.usda && i.usda.per100g) ? i.usda : null,
+      gramsEquivalent: (i.gramsEquivalent ?? '').toString(),
+    }))
+    .filter(i => i.name)
+    : [];
+
+  const steps = Array.isArray(raw.steps) ? raw.steps
+    .map(s => ({
+      text: (s.text ?? '').toString().trim(),
+      why: (s.why ?? '').toString().trim(),
+    }))
+    .filter(s => s.text)
+    : [];
+
+  const now = Date.now();
+  return {
+    id: uid('r'),
+    title,
+    category,
+    servings: raw.servings ? Number(raw.servings) || null : null,
+    prepTime: (raw.prepTime ?? '').toString().trim(),
+    cookTime: (raw.cookTime ?? '').toString().trim(),
+    equipment: (raw.equipment ?? '').toString().trim(),
+    notes: (raw.notes ?? '').toString().trim(),
+    ingredients,
+    steps,
+    updatedAt: now,
+    createdAt: now,
+  };
+}
+
+function handleImportFile(file){
+  const statusEl = $('#importStatus');
+  if(!file){ return; }
+  if(!file.name.toLowerCase().endsWith('.json')){
+    statusEl.textContent = 'That doesn\'t look like a .json file.';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let parsed;
+    try{
+      parsed = JSON.parse(reader.result);
+    }catch(e){
+      statusEl.textContent = 'Couldn\'t read that file — it isn\'t valid JSON.';
+      return;
+    }
+
+    // Accept either a single recipe object or {recipes:[...]} or a raw array
+    let candidates = [];
+    if(Array.isArray(parsed)) candidates = parsed;
+    else if(Array.isArray(parsed.recipes)) candidates = parsed.recipes;
+    else candidates = [parsed];
+
+    const imported = candidates.map(normalizeImportedRecipe).filter(Boolean);
+    const skipped = candidates.length - imported.length;
+
+    if(imported.length === 0){
+      statusEl.textContent = 'No valid recipes found in that file (each needs at least a title).';
+      return;
+    }
+
+    state.recipes.push(...imported);
+    saveState();
+    renderGrid();
+
+    const names = imported.map(r=>r.title).join(', ');
+    statusEl.textContent = `Imported: ${names}${skipped ? ` (skipped ${skipped} invalid entry)` : ''}`;
+    showToast(imported.length === 1 ? 'Recipe imported' : `${imported.length} recipes imported`);
+  };
+  reader.onerror = ()=>{ statusEl.textContent = 'Couldn\'t read that file.'; };
+  reader.readAsText(file);
 }
 
 // ---------- Wire up events ----------
@@ -696,6 +790,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
   $('#settingsBtn').onclick = openSettingsSheet;
   $('#closeSettingsBtn').onclick = closeSettingsSheet;
   $('#saveSettingsBtn').onclick = saveSettings;
+  $('#importFileBtn').onclick = ()=> $('#importFileInput').click();
+  $('#importFileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    handleImportFile(file);
+    e.target.value = ''; // reset so the same file can be re-selected later if needed
+  });
 
   $all('nav.tabbar button').forEach(btn=>{
     btn.onclick = ()=>{

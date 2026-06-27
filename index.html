@@ -446,6 +446,12 @@
     </div>
     <div class="settings-hint">Same key your fitness tracker uses. Needed only for linking nutrition data to ingredients — recipes work fine without it.</div>
 
+    <div class="section-label" style="margin-top:22px;">Import Recipe</div>
+    <div class="settings-hint" style="margin-top:0;">Import a recipe file (.json) — for example, one Claude transcribed from a photo of a recipe. This adds a new recipe; it won't overwrite anything you already have.</div>
+    <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
+    <button class="btn-secondary" id="importFileBtn" style="margin-top:8px;">Choose Recipe File…</button>
+    <div id="importStatus" class="settings-hint" style="margin-top:8px;"></div>
+
     <button class="btn-primary" id="saveSettingsBtn" style="margin-top:18px;">Save Settings</button>
     <button class="btn-secondary" id="closeSettingsBtn">Close</button>
   </div>
