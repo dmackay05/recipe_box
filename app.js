@@ -192,7 +192,7 @@ function filteredRecipes(){
       return (r.ingredients||[]).some(i => (i.name||'').toLowerCase().includes(q));
     });
   }
-  return list.sort((a,b)=> (b.updatedAt||0) - (a.updatedAt||0));
+  return list.sort((a,b)=> a.title.localeCompare(b.title, undefined, {sensitivity:'base'}));
 }
 
 function renderGrid(){
