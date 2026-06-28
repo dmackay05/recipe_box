@@ -1,12 +1,12 @@
 // Notebook — Recipe Box service worker
-const CACHE_NAME = 'notebook-cache-v2';
+const CACHE_NAME = 'notebook-cache-v3';
 const SHELL = [
   './index.html',
   './app.js',
   './usda.js',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
+  './icon-192.png',
+  './icon-512.png',
 ];
 
 self.addEventListener('install', (event)=>{
