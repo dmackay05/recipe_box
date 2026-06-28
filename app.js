@@ -6,6 +6,7 @@ const SCRIPT_URL_KEY = 'notebook.scriptUrl.v1';
 const LAST_SYNC_KEY = 'notebook.lastSync.v1';
 const SEED_FLAG_KEY = 'notebook.seeded.v1';
 const USDA_KEY_KEY = 'notebook.usdaKey.v1';
+const OWNER_KEY_KEY = 'notebook.ownerKey.v1';
 
 const CATEGORIES = ['All','Breakfast','Mains','Sides','Soups & Stews','Baking','Sauces & Condiments'];
 
@@ -583,35 +584,53 @@ function pushToSheet(){
   const url = getScriptUrl();
   if(!url){ showToast('Add your Sheet URL in Settings first'); openSettingsSheet(); return; }
 
-  const payload = JSON.stringify({ action:'save', recipes: state.recipes });
+  const payload = JSON.stringify({ action:'save', recipes: state.recipes, ownerKey: getOwnerKey() });
+  const formData = new URLSearchParams();
+  formData.set('payload', payload);
 
-  // iframe form POST to bypass CORS, same pattern as other apps
-  const iframe = document.createElement('iframe');
-  iframe.name = 'notebook-sync-frame';
-  iframe.style.display = 'none';
-  document.body.appendChild(iframe);
+  fetch(url, { method:'POST', body: formData })
+    .then(res => res.text())
+    .then(text => {
+      if(text && text.indexOf('error') === 0){
+        showToast(text.toLowerCase().includes('not authorized')
+          ? 'Push blocked — read-only access (no owner key)'
+          : 'Push failed — see Settings for details');
+        return;
+      }
+      localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+      updateSyncStatusText();
+      showToast('Pushed to sheet');
+    })
+    .catch(()=>{
+      // Fall back to the old no-CORS-readable iframe approach for older/restricted
+      // deployments that don't return CORS headers on POST.
+      const iframe = document.createElement('iframe');
+      iframe.name = 'notebook-sync-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
 
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = url;
-  form.target = 'notebook-sync-frame';
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = url;
+      form.target = 'notebook-sync-frame';
 
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'payload';
-  input.value = payload;
-  form.appendChild(input);
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'payload';
+      input.value = payload;
+      form.appendChild(input);
 
-  document.body.appendChild(form);
-  form.submit();
+      document.body.appendChild(form);
+      form.submit();
 
-  setTimeout(()=>{
-    document.body.removeChild(form);
-    document.body.removeChild(iframe);
-    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-    updateSyncStatusText();
-    showToast('Pushed to sheet');
-  }, 1200);
+      setTimeout(()=>{
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+        localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+        updateSyncStatusText();
+        showToast('Pushed to sheet (could not confirm result)');
+      }, 1200);
+    });
 }
 
 function pullFromSheet(silent){
@@ -641,12 +660,15 @@ function pullFromSheet(silent){
   document.body.appendChild(script);
 }
 
-// ---------- Settings (USDA key + Sheets URL) ----------
+// ---------- Settings (USDA key + Sheets URL + Owner key) ----------
 function getUsdaKey(){ return localStorage.getItem(USDA_KEY_KEY) || ''; }
 function setUsdaKey(key){ localStorage.setItem(USDA_KEY_KEY, key); }
+function getOwnerKey(){ return localStorage.getItem(OWNER_KEY_KEY) || ''; }
+function setOwnerKey(key){ localStorage.setItem(OWNER_KEY_KEY, key); }
 
 function openSettingsSheet(){
   $('#set_scriptUrl').value = getScriptUrl();
+  $('#set_ownerKey').value = getOwnerKey();
   $('#set_usdaKey').value = getUsdaKey();
   $('#importStatus').textContent = '';
   $('#settingsOverlay').classList.add('open');
@@ -655,8 +677,10 @@ function closeSettingsSheet(){ $('#settingsOverlay').classList.remove('open'); }
 
 function saveSettings(){
   const url = $('#set_scriptUrl').value.trim();
+  const ownerKey = $('#set_ownerKey').value.trim();
   const key = $('#set_usdaKey').value.trim();
   setScriptUrl(url);
+  setOwnerKey(ownerKey);
   setUsdaKey(key);
   closeSettingsSheet();
   showToast('Settings saved');

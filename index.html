@@ -441,6 +441,12 @@
     <div class="settings-hint">Paste the /exec URL from your deployed Apps Script. This is what Push/Pull in the Sync tab talk to.</div>
 
     <div class="field" style="margin-top:18px;">
+      <label>Owner Key (optional)</label>
+      <input type="text" id="set_ownerKey" placeholder="leave blank unless you set one in Code.gs">
+    </div>
+    <div class="settings-hint">Only needed if you protected your own sheet with an owner key in Code.gs. If someone shared their recipe sheet with you, leave this blank — you'll be able to Pull their recipes but Push will be blocked, which is expected for read-only sharing.</div>
+
+    <div class="field" style="margin-top:18px;">
       <label>USDA FoodData Central API Key</label>
       <input type="text" id="set_usdaKey" placeholder="paste your USDA API key">
     </div>
