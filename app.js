@@ -591,19 +591,31 @@ function pushToSheet(){
   fetch(url, { method:'POST', body: formData })
     .then(res => res.text())
     .then(text => {
-      if(text && text.indexOf('error') === 0){
-        showToast(text.toLowerCase().includes('not authorized')
+      const trimmed = (text || '').trim();
+      if(trimmed.indexOf('error') === 0){
+        showToast(trimmed.toLowerCase().includes('not authorized')
           ? 'Push blocked — read-only access (no owner key)'
           : 'Push failed — see Settings for details');
         return;
+      }
+      if(trimmed !== 'ok'){
+        // Apps Script didn't return our expected 'ok' — likely a Google
+        // redirect/login HTML page instead of the real script response.
+        // Don't report success; fall through to the iframe fallback, which
+        // works even when fetch can't read a usable response.
+        throw new Error('unexpected response: ' + trimmed.slice(0, 80));
       }
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
       updateSyncStatusText();
       showToast('Pushed to sheet');
     })
-    .catch(()=>{
+    .catch((err)=>{
+      if(err && err.message && err.message.indexOf('unexpected response') === 0){
+        console.warn('Push fetch returned unexpected content, falling back to iframe:', err.message);
+      }
       // Fall back to the old no-CORS-readable iframe approach for older/restricted
-      // deployments that don't return CORS headers on POST.
+      // deployments that don't return CORS headers on POST, or whose fetch response
+      // can't be trusted (e.g. Google interstitial HTML instead of our script's text).
       const iframe = document.createElement('iframe');
       iframe.name = 'notebook-sync-frame';
       iframe.style.display = 'none';
