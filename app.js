@@ -251,7 +251,7 @@ function openDetail(id){
   // Nutrition
   const nutri = computeNutrition(r);
   const nutriCard = $('#nutriCard');
-  if(nutri.hasAnyLinked){
+  if(nutri.hasAnyData){
     nutriCard.style.display = 'block';
     const grid = $('#nutriGrid');
     grid.innerHTML = '';
@@ -265,7 +265,10 @@ function openDetail(id){
       n.innerHTML = `<div class="val">${val}</div><div class="lab">${lab}</div>`;
       grid.appendChild(n);
     });
-    $('#partialNote').style.display = nutri.allLinked ? 'none' : 'block';
+    $('#partialNote').style.display = (nutri.source === 'ingredients' && !nutri.allLinked) ? 'block' : 'none';
+    if(nutri.source === 'ingredients' && !nutri.allLinked){
+      $('#partialNote').textContent = "Some ingredients aren't linked to nutrition data — totals may be incomplete.";
+    }
   } else {
     nutriCard.style.display = 'none';
   }
@@ -311,6 +314,21 @@ function closeDetail(){
 }
 
 // ---------- Nutrition calc ----------
+// Returns per-serving calories/protein/carbs/fat for a recipe, from one of two sources:
+//   1. Ingredient-level USDA links (existing behavior) — computed and divided by servings.
+//   2. A recipe-level `nutrition` block (e.g. copied from a cookbook's printed nutrition
+//      panel) — used as-is, since those figures are already stated per serving.
+// Ingredient links take priority if any exist; the recipe-level block is the fallback
+// for recipes that don't have ingredients linked yet.
+function parseNutritionValue(v){
+  // Accepts a number (200) or a string with a unit ("5g", "740mg") and returns
+  // just the numeric portion. Returns 0 for anything unparseable.
+  if(v === null || v === undefined) return 0;
+  if(typeof v === 'number') return v;
+  const match = String(v).match(/-?\d+(\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+
 function computeNutrition(recipe){
   const servings = Math.max(1, Number(recipe.servings) || 1);
   let totals = {calories:0, protein:0, carbs:0, fat:0};
@@ -335,15 +353,44 @@ function computeNutrition(recipe){
     }
   });
 
+  if(anyLinked){
+    return {
+      hasAnyData: true,
+      source: 'ingredients',
+      allLinked: allLinked,
+      perServing: {
+        calories: totals.calories / servings,
+        protein: totals.protein / servings,
+        carbs: totals.carbs / servings,
+        fat: totals.fat / servings,
+      }
+    };
+  }
+
+  // Fallback: recipe-level nutrition block, already stated per serving —
+  // don't divide by servings again.
+  const n = recipe.nutrition;
+  if(n && typeof n === 'object'){
+    const perServing = {
+      calories: parseNutritionValue(n.calories),
+      protein: parseNutritionValue(n.protein),
+      carbs: parseNutritionValue(n.carbs),
+      fat: parseNutritionValue(n.fat),
+    };
+    const hasAnyData = perServing.calories > 0 || perServing.protein > 0 || perServing.carbs > 0 || perServing.fat > 0;
+    return {
+      hasAnyData,
+      source: 'recipeLevel',
+      allLinked: true, // not applicable to this source; treated as complete
+      perServing,
+    };
+  }
+
   return {
-    hasAnyLinked: anyLinked,
-    allLinked: anyLinked && allLinked,
-    perServing: {
-      calories: totals.calories / servings,
-      protein: totals.protein / servings,
-      carbs: totals.carbs / servings,
-      fat: totals.fat / servings,
-    }
+    hasAnyData: false,
+    source: 'none',
+    allLinked: false,
+    perServing: {calories:0, protein:0, carbs:0, fat:0},
   };
 }
 
@@ -464,6 +511,8 @@ function saveRecipe(){
   const cleanIngs = ingDraft.filter(i => (i.name||'').trim());
   const cleanSteps = stepDraft.filter(s => (s.text||'').trim()).map(s=>({text:s.text, why:s.why||''}));
 
+  const existing = editingId ? state.recipes.find(x=>x.id===editingId) : null;
+
   const recipe = {
     id: editingId || uid('r'),
     title,
@@ -475,8 +524,12 @@ function saveRecipe(){
     notes: $('#f_notes').value.trim(),
     ingredients: cleanIngs,
     steps: cleanSteps,
+    // Preserve a recipe-level nutrition block (e.g. imported from a cookbook's
+    // printed panel) across edits — the edit sheet has no UI for it yet, so
+    // there's nothing in the form to overwrite it with.
+    nutrition: existing ? existing.nutrition : undefined,
     updatedAt: Date.now(),
-    createdAt: editingId ? (state.recipes.find(x=>x.id===editingId)||{}).createdAt || Date.now() : Date.now(),
+    createdAt: editingId ? (existing||{}).createdAt || Date.now() : Date.now(),
   };
 
   if(editingId){
@@ -730,6 +783,11 @@ function normalizeImportedRecipe(raw){
     .filter(s => s.text)
     : [];
 
+  // Recipe-level nutrition block, e.g. from a cookbook's printed nutrition
+  // panel. Accept it as-is (with whatever keys/units it has) — computeNutrition
+  // handles unit-suffixed strings like "5g" or "740mg" via parseNutritionValue.
+  const nutrition = (raw.nutrition && typeof raw.nutrition === 'object') ? raw.nutrition : undefined;
+
   const now = Date.now();
   return {
     id: uid('r'),
@@ -742,6 +800,7 @@ function normalizeImportedRecipe(raw){
     notes: (raw.notes ?? '').toString().trim(),
     ingredients,
     steps,
+    nutrition,
     updatedAt: now,
     createdAt: now,
   };
